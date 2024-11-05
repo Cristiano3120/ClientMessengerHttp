@@ -14,7 +14,7 @@ namespace ClientMessengerHttp
             var server = new ClientWebSocket();
             try
             {
-                throw new NotImplementedException("Mach das die file paths dynamisch sind");
+                throw new NotImplementedException("Mach das die file paths dynamisch sind!");
                 await server.ConnectAsync(GetServerAdress(), cancellationToken);
                 _ = Logger.LogAsync("Connected sucessfully to the server!");
                 _ = Task.Run(() => ReceiveMessages(server, cancellationToken));
