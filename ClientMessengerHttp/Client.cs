@@ -15,7 +15,6 @@ namespace ClientMessengerHttp
             var server = new ClientWebSocket();
             try
             {
-                //throw new NotImplementedException("Mach das die file paths dynamisch sind!");
                 await server.ConnectAsync(GetServerAdress(true), cancellationToken);
                 _ = Logger.LogAsync("Connected sucessfully to the server!");
                 _ = Task.Run(() => ReceiveMessages(server, cancellationToken));
@@ -39,18 +38,35 @@ namespace ClientMessengerHttp
                 {
                     WebSocketReceiveResult receivedData = await server.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
                     _ = Logger.LogAsync($"RECEIVED: The received payload is {receivedData.Count} bytes long");
+
+                    if (receivedData.CloseStatus is WebSocketCloseStatus closeStatus)
+                    {
+                        await HandleClosingMessage(server, closeStatus, receivedData.CloseStatusDescription!);
+                    }
+
                     var receivedDataAsString = Convert.ToBase64String(buffer, 0, receivedData.Count);
                     completeMessage.Append(receivedDataAsString);
-                    JsonElement message;
+                    JsonElement? message;
 
                     if (receivedData.EndOfMessage)
                     {
                         message = Security.DecyrptMessage(completeMessage.ToString());
-                        completeMessage.Clear();
-                        _ = Logger.LogAsync($"RECEIVED: {message}");
-                        OpCode opCode = message.GetProperty("code").GetOpCode();
+                        if (message is JsonElement root)
+                        {
+                            completeMessage.Clear();
+                            _ = Logger.LogAsync($"RECEIVED: {root}");
+                            OpCode opCode = root.GetProperty("code").GetOpCode();
 
-                        _ = HandleMessage(server, opCode, message);
+                            _ = HandleMessage(server, opCode, root);
+                        }
+                        else
+                        {
+                            await server.CloseAsync
+                                (WebSocketCloseStatus.InvalidPayloadData,
+                                "The message couldn´t be decrypted.",
+                                CancellationToken.None);
+                            break;
+                        }
                     }
                     else
                     {
@@ -62,7 +78,7 @@ namespace ClientMessengerHttp
                     Logger.LogException(ex);
                 }  
             }
-            await Restart();
+            await Restart(server);
         }
 
         private static async Task HandleMessage(ClientWebSocket server, OpCode opCode, JsonElement root)
@@ -86,11 +102,18 @@ namespace ClientMessengerHttp
             }
         }
 
+        private static async Task HandleClosingMessage(WebSocket server, WebSocketCloseStatus socketCloseStatus, string reason)
+        {
+            await Logger.LogAsync([$"The server closed the connection.", $"Close status: {socketCloseStatus}", $"Reason: {reason}"]);
+            await Restart(server);
+        }
+
         /// <summary>
         /// Called when connection to the Server is lost
         /// </summary>
-        private static async Task Restart()
+        private static async Task Restart(WebSocket server)
         {
+            server?.Dispose();
             await Task.Delay(3000);
             _ = Logger.LogAsync("Lost connection to the Server. Restarting");
             _ = Start();
@@ -174,9 +197,23 @@ namespace ClientMessengerHttp
             }
             else
             {
-                var streamReader = new StreamReader("C:\\Users\\Crist\\source\\repos\\ClientMessengerHttp\\ClientMessengerHttp\\NeededFiles\\ServerAdress.txt");
+                var streamReader = new StreamReader(GetPathByFilename("ServerAdress.txt"));
                 return new Uri(streamReader.ReadToEnd());
             }
         }
+
+        internal static string GetPathByFilename(string filename)
+        {
+#if DEBUG
+            return Path.Combine(@"C:\Users\Crist\source\repos\ClientMessengerHttp\ClientMessengerHttp\NeededFiles", filename);
+#else
+            var exePath = Assembly.GetExecutingAssembly().Location;
+            var index = exePath.IndexOf("ClientMesseger");
+            exePath = exePath.Remove(index);
+            var NeddedFilesDirectory = Path.Combine(exePath, "NeededFiles");
+            return Path.Combine(NeddedFilesDirectory, filename);
+#endif
+        }
+
     }
 }

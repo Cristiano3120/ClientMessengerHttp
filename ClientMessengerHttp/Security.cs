@@ -76,7 +76,7 @@ namespace ClientMessengerHttp
 
         #region Decryption
 
-        internal static JsonElement DecyrptMessage(string messageToDecyrpt)
+        internal static JsonElement? DecyrptMessage(string messageToDecyrpt)
         {
             var dataAsBytes = Convert.FromBase64String(messageToDecyrpt);
             try
@@ -89,7 +89,7 @@ namespace ClientMessengerHttp
             }
         }
 
-        private static JsonElement DecryptAes(byte[] dataToDecrypt)
+        private static JsonElement? DecryptAes(byte[] dataToDecrypt)
         {
             try
             {
@@ -107,9 +107,11 @@ namespace ClientMessengerHttp
                     return JsonSerializer.Deserialize<JsonElement>(decryptedData);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw new Exception();
+                Logger.LogException(ex);
+                return null;
+
             }
         }
     }
