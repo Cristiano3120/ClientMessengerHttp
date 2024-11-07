@@ -6,6 +6,7 @@ namespace ClientMessengerHttp
     {
         ReceiveRSA = 0,
         SendAes = 1,
+        ServerReadyToReceive = 2,
     }
 
     internal static class OpCodeExtensions

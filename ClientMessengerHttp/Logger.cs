@@ -50,21 +50,37 @@ namespace ClientMessengerHttp
         internal static void LogException(Exception ex)
         {
             StackTrace stackTrace = new(ex, true);
-            StackFrame? stackFrame = stackTrace?.GetFrame(0);
+            StackFrame? stackFrame = null;
+            foreach (StackFrame item in stackTrace.GetFrames())
+            {
+                //Looking for the frame contains the infos about the error
+                if (item.GetMethod()?.Name != null && item.GetFileName() != null)
+                {
+                    stackFrame = item;
+                    break;
+                }
+            }
 
-            var methodName = stackFrame?.GetMethod()?.Name + "()";
-            var filename = stackFrame?.GetFileName() ?? throw new Exception("Filename is missing");
-            var lineNum = stackFrame?.GetFileLineNumber();
-            var columnNum = stackFrame?.GetFileColumnNumber();
+            if (stackFrame != null)
+            {
+                var methodName = stackFrame?.GetMethod()?.Name + "()";
+                var filename = stackFrame?.GetFileName() ?? "missing filename";
+                var lineNum = stackFrame?.GetFileLineNumber();
+                var columnNum = stackFrame?.GetFileColumnNumber();
 
-            //The var filename is the whole path to the file. This shortens it down to the filename 
-            var index = filename.LastIndexOf(@"\") + 1;
-            filename = filename.Remove(0, index);
+                //The var filename is the whole path to the file. This shortens it down to the filename 
+                var index = filename.LastIndexOf(@"\") + 1;
+                filename = filename.Remove(0, index);
 
-            var errorInfos = $"ERROR in file {filename}, in {methodName}, at line: {lineNum}, at column: {columnNum}";
-            var errorMessage = $"ERROR: {ex.Message}";
+                var errorInfos = $"ERROR in file {filename}, in {methodName}, at line: {lineNum}, at column: {columnNum}";
+                var errorMessage = $"ERROR: {ex.Message}";
 
-            _ = LogAsync([errorInfos, errorMessage]);
+                _ = LogAsync([errorInfos, errorMessage]);
+            }
+            else
+            {
+                _ = LogAsync($"ERROR: {ex.Message}");
+            }
         }
 
         #endregion
